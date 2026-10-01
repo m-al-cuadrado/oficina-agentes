@@ -16,7 +16,7 @@ MODEL_REASONER = "claude-opus-5-5"
 # VERIFÍCALOS en la web oficial: cambian y las fuentes se contradicen.
 PRICES = {
     MODEL_CHEAP:    (1.0, 5.0),
-    MODEL_WRITER:   (2.0, 10.0),
+    MODEL_WRITER:   (3.0, 15.0),
     MODEL_REASONER: (4.0, 20.0),
 }
 

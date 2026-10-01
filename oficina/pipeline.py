@@ -21,18 +21,32 @@ def _alog(event, detail):
         log.exception("No se pudo escribir en agent_log")
 
 
+def _known_category(mail_id):
+    """Categoría si el correo ya está guardado; None si es nuevo."""
+    with psycopg.connect(DATABASE_URL) as c:
+        row = c.execute("SELECT category FROM emails WHERE id=%s", (mail_id,)).fetchone()
+    return row[0] if row else None
+
+
 def process_new_mail():
     """Clasifica los correos nuevos y devuelve los importantes [(mail, resultado)].
 
+    Orden: 1) clasificar, 2) guardar en la base de datos, 3) etiquetar en Gmail.
+    Si falla el paso 3, el correo se reetiqueta en el siguiente ciclo sin volver a clasificar.
     - Si se agota el tope diario, se detiene y devuelve lo ya procesado.
     - Si un correo concreto falla, se registra y se sigue con el siguiente.
     """
     important = []
     for ref in gmail.list_unprocessed():
         try:
+            known = _known_category(ref["id"])
+            if known:
+                gmail.apply_labels(ref["id"], ["oficina", f"oficina/{known}"])
+                _alog("relabeled", {"mail_id": ref["id"]})
+                continue
+
             mail = gmail.get_message(ref["id"])
             res = classify(mail)
-            gmail.apply_labels(mail["id"], ["oficina", f"oficina/{res['category']}"])
             with psycopg.connect(DATABASE_URL) as c:
                 c.execute(
                     "INSERT INTO emails(id, thread_id, sender, subject, snippet, category, "
@@ -42,6 +56,7 @@ def process_new_mail():
                      mail["snippet"], res["category"], res["summary"], res["needs_reply"],
                      MODEL_CHEAP, res["classified_with"], res["body_chars"]),
                 )
+            gmail.apply_labels(mail["id"], ["oficina", f"oficina/{res['category']}"])
             _alog("classified", {"mail_id": mail["id"], "category": res["category"],
                                  "classified_with": res["classified_with"],
                                  "body_chars": res["body_chars"]})
