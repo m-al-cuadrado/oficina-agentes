@@ -94,13 +94,21 @@ def get_body_text(msg_id, max_chars=4000):
 
 
 # ---------- etiquetas y borradores (no existe función de envío ni de borrado) ----------
+_LABELS: dict[str, str] = {}   # caché nombre -> id (se carga una sola vez por ejecución)
+
+
 def ensure_label(name):
+    if name in _LABELS:
+        return _LABELS[name]
     svc = _service()
-    labels = svc.users().labels().list(userId="me").execute()["labels"]
-    for l in labels:
-        if l["name"] == name:
-            return l["id"]
-    return svc.users().labels().create(userId="me", body={"name": name}).execute()["id"]
+    if not _LABELS:   # primera vez: cargar todas las etiquetas existentes
+        for l in svc.users().labels().list(userId="me").execute()["labels"]:
+            _LABELS[l["name"]] = l["id"]
+        if name in _LABELS:
+            return _LABELS[name]
+    created = svc.users().labels().create(userId="me", body={"name": name}).execute()
+    _LABELS[name] = created["id"]
+    return created["id"]
 
 
 def apply_labels(msg_id, label_names):
