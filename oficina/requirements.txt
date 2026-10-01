@@ -1,0 +1,7 @@
+python-telegram-bot[job-queue]
+psycopg[binary]
+anthropic
+google-api-python-client
+google-auth-oauthlib
+python-dotenv
+langgraph
